@@ -1,0 +1,5 @@
+# chaves privadas
+*.pem
+*.key
+id_rsa
+id_rsa.pub
