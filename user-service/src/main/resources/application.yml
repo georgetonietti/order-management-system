@@ -1,0 +1,12 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://db:5432/users
+    username: user
+    password: password
+  jpa:
+    hibernate:
+      ddl-auto: update
+
+rsa:
+  public-key: classpath:public.pem
+  private-key: classpath:private.pem
