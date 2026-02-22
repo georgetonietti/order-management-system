@@ -1,23 +1,62 @@
 services:
-  db:
+
+# User Service configuration
+  user-db:
     image: postgres:16-alpine
+    container_name: user-db
     environment:
       POSTGRES_DB: users
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     ports:
       - "5432:5432"
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - user-data:/var/lib/postgresql/data
     networks:
       - app-network
 
   user-service:
-    build: ./user-service
+    build:
+      context: ./user-service
+    container_name: user-service
     ports:
       - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://user-db:5432/users
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
     depends_on:
-      - db
+      - user-db
+    networks:
+      - app-network
+
+# Product Service configuration
+  product-db:
+    image: postgres:16-alpine
+    container_name: product-db
+    environment:
+      POSTGRES_DB: productdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - product-data:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+  product-service:
+    build:
+      context: ./product-service
+    container_name: product-service
+    ports:
+      - "8081:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://product-db:5432/productdb
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+    depends_on:
+      - product-db
     networks:
       - app-network
 
@@ -25,4 +64,5 @@ networks:
   app-network:
 
 volumes:
-  postgres-data:
+  user-data:
+  product-data:
