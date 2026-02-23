@@ -1,5 +1,6 @@
 package com.dev.order_service.dto;
 
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -11,5 +12,5 @@ public record ProductResponse(
         BigDecimal price,
         Integer stock,
         LocalDateTime createdAt
-) {
+) implements Serializable {
 }

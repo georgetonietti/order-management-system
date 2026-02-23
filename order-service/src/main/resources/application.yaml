@@ -1,12 +1,18 @@
 spring:
   datasource:
-    url: jdbc:postgresql://order-db:5432/orderdb
-    username: postgres
-    password: postgres
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
   jpa:
     hibernate:
       ddl-auto: update
     show-sql: true
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: 6379
+  cache:
+    type: redis
 
 feign:
   client:

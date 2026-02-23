@@ -1,15 +1,15 @@
 package com.dev.order_service.service;
 
-import com.dev.order_service.client.ProductClient;
 import com.dev.order_service.client.UserClient;
 import com.dev.order_service.domain.Order;
 import com.dev.order_service.domain.OrderStatus;
 import com.dev.order_service.dto.CreateOrderRequest;
 import com.dev.order_service.dto.OrderResponse;
-import com.dev.order_service.dto.ProductResponse;
+
 import com.dev.order_service.dto.UserResponse;
 import com.dev.order_service.repository.OrderRepository;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -22,12 +22,12 @@ public class OrderService {
 
     private final OrderRepository repository;
     private final UserClient userClient;
-    private final ProductClient productClient;
+    private final ProductLookupService poductLookupService;
 
     public OrderResponse createOrder(CreateOrderRequest request) {
 
         var user = getUser(request.userId());
-        var product = getProduct(request.productId());
+        var product = poductLookupService.getProduct(request.productId());
 
         BigDecimal total = product.price().multiply(BigDecimal.valueOf(request.quantity()));
 
@@ -66,17 +66,8 @@ public class OrderService {
         return userClient.getUserById(id);
     }
 
-    @CircuitBreaker(name = "productService", fallbackMethod = "productFallback")
-    private ProductResponse getProduct(UUID id) {
-        return productClient.getProductById(id);
-    }
-
     private UserResponse userFallback(UUID id, Throwable ex) {
         throw new RuntimeException("User service unavailable");
-    }
-
-    private ProductResponse productFallback(UUID id, Throwable ex) {
-        throw new RuntimeException("Product service unavailable");
     }
 
     private OrderResponse mapToResponse(Order order) {
