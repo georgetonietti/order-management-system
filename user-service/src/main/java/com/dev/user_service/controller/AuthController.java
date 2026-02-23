@@ -1,7 +1,9 @@
 package com.dev.user_service.controller;
 
 import com.dev.user_service.dto.LoginRequest;
+import com.dev.user_service.dto.LoginResponse;
 import com.dev.user_service.dto.RegisterRequest;
+import com.dev.user_service.dto.UserResponse;
 import com.dev.user_service.security.JwtService;
 import com.dev.user_service.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -26,13 +28,14 @@ public class AuthController {
     private final UserService userService;
 
     @PostMapping("/register")
-    public void register(@RequestBody RegisterRequest request) {
-        userService.register(request.name(), request.email(), request.password());
+    public ResponseEntity<UserResponse> register(@RequestBody RegisterRequest request) {
+        UserResponse user = userService.register(request.name(), request.email(), request.password());
+        return ResponseEntity.ok(user);
     }
 
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
 
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
@@ -41,8 +44,17 @@ public class AuthController {
                 )
         );
 
+        UserResponse user = userService.findByEmail(authentication.getName());
         String token = jwtService.generateToken(authentication);
 
-        return ResponseEntity.ok(Map.of("access_token", token));
+        LoginResponse loginResponse = new LoginResponse(
+                user.id(),
+                user.name(),
+                user.email(),
+                token
+        );
+
+
+        return ResponseEntity.ok(loginResponse);
     }
 }
