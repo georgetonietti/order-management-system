@@ -6,11 +6,15 @@ import com.dev.order_service.domain.Order;
 import com.dev.order_service.domain.OrderStatus;
 import com.dev.order_service.dto.CreateOrderRequest;
 import com.dev.order_service.dto.OrderResponse;
+import com.dev.order_service.dto.ProductResponse;
+import com.dev.order_service.dto.UserResponse;
 import com.dev.order_service.repository.OrderRepository;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -22,8 +26,8 @@ public class OrderService {
 
     public OrderResponse createOrder(CreateOrderRequest request) {
 
-        var user = userClient.getUserById(request.userId());
-        var product = productClient.getProductById(request.productId());
+        var user = getUser(request.userId());
+        var product = getProduct(request.productId());
 
         BigDecimal total = product.price().multiply(BigDecimal.valueOf(request.quantity()));
 
@@ -55,6 +59,24 @@ public class OrderService {
         Order updated = repository.save(order);
 
         return mapToResponse(updated);
+    }
+
+    @CircuitBreaker(name = "userService", fallbackMethod = "userFallback")
+    private UserResponse getUser(UUID id) {
+        return userClient.getUserById(id);
+    }
+
+    @CircuitBreaker(name = "productService", fallbackMethod = "productFallback")
+    private ProductResponse getProduct(UUID id) {
+        return productClient.getProductById(id);
+    }
+
+    private UserResponse userFallback(UUID id, Throwable ex) {
+        throw new RuntimeException("User service unavailable");
+    }
+
+    private ProductResponse productFallback(UUID id, Throwable ex) {
+        throw new RuntimeException("Product service unavailable");
     }
 
     private OrderResponse mapToResponse(Order order) {
