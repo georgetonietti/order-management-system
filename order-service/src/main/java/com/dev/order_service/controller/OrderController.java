@@ -18,8 +18,11 @@ public class OrderController {
     private final OrderService service;
 
     @PostMapping
-    public OrderResponse create(@RequestBody @Valid CreateOrderRequest request) {
-        return service.createOrder(request);
+    public OrderResponse create(
+            @RequestBody @Valid CreateOrderRequest request,
+            @RequestHeader("Idempotency-Key") String idempotencyKey
+    ) {
+        return service.createOrder(request, idempotencyKey);
     }
 
     @PatchMapping("/{id}/status")
