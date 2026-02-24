@@ -43,6 +43,4 @@ public class Order {
         this.createdAt = LocalDateTime.now();
     }
 
-    @Column(unique = true, nullable = false)
-    private String idempotencyKey;
 }
