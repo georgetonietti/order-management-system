@@ -18,7 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -26,25 +26,25 @@ import java.util.UUID;
 public class OrderService {
 
     private final OrderRepository repository;
-    private final IdempotencyRecordRepository idempotencyRecordRepository;
     private final UserClient userClient;
     private final ProductLookupService poductLookupService;
+    private final IdempotencyService idempotencyService;
 
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest request, String idempotencyKey) {
 
         UUID userId = request.userId();
 
-        var existingOrder = idempotencyRecordRepository.findByIdempotencyKeyAndUserId(idempotencyKey, userId);
+        Optional<Long> redisHit = idempotencyService.checkRedis(userId, idempotencyKey);
 
-        if (existingOrder.isPresent()) {
-            Order order = repository.findById(existingOrder.get().getOrderId()).orElseThrow();
-
-            return mapToResponse(order);
+        if (redisHit.isPresent()) {
+            return repository.findById(redisHit.get())
+                    .map(this::mapToResponse)
+                    .orElseThrow();
         }
 
         try {
-            var user = getUser(request.userId());
+            var user = getUser(userId);
             var product = poductLookupService.getProduct(request.productId());
 
             BigDecimal total = product.price().multiply(BigDecimal.valueOf(request.quantity()));
@@ -59,26 +59,21 @@ public class OrderService {
 
             Order savedOrder = repository.save(order);
 
-            idempotencyRecordRepository.save(
-                    IdempotencyRecord.builder()
-                            .idempotencyKey(idempotencyKey)
-                            .userId(userId)
-                            .orderId(savedOrder.getId())
-                            .build()
-            );
+            idempotencyService.save(userId, idempotencyKey, savedOrder.getId());
 
             return mapToResponse(savedOrder);
+
         } catch (DataIntegrityViolationException ex) {
 
-            var record = idempotencyRecordRepository
+            var record = idempotencyService
                     .findByIdempotencyKeyAndUserId(idempotencyKey, userId)
                     .orElseThrow();
 
-            var order = repository
-                    .findById(record.getOrderId())
-                    .orElseThrow();
+            idempotencyService.saveOnRedis(userId, idempotencyKey, record.getOrderId());
 
-            return mapToResponse(order);
+            return repository.findById(record.getOrderId())
+                    .map(this::mapToResponse)
+                    .orElseThrow();
         }
     }
 
