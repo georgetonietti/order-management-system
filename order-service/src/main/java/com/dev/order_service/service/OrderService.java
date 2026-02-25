@@ -1,18 +1,15 @@
 package com.dev.order_service.service;
 
 import com.dev.order_service.client.UserClient;
-import com.dev.order_service.domain.IdempotencyRecord;
 import com.dev.order_service.domain.Order;
+import com.dev.order_service.dto.*;
 import com.dev.order_service.domain.OrderStatus;
-import com.dev.order_service.dto.CreateOrderRequest;
-import com.dev.order_service.dto.OrderResponse;
 
-import com.dev.order_service.dto.UserResponse;
-import com.dev.order_service.repository.IdempotencyRecordRepository;
 import com.dev.order_service.repository.OrderRepository;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +26,7 @@ public class OrderService {
     private final UserClient userClient;
     private final ProductLookupService poductLookupService;
     private final IdempotencyService idempotencyService;
+    private final ApplicationEventPublisher publisher;
 
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest request, String idempotencyKey) {
@@ -60,6 +58,14 @@ public class OrderService {
             Order savedOrder = repository.save(order);
 
             idempotencyService.save(userId, idempotencyKey, savedOrder.getId());
+
+            publisher.publishEvent(new OrderCreatedDomainEvent(
+                    savedOrder.getId(),
+                    savedOrder.getUserId(),
+                    savedOrder.getProductId(),
+                    savedOrder.getQuantity(),
+                    savedOrder.getTotalPrice()
+            ));
 
             return mapToResponse(savedOrder);
 
