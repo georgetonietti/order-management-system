@@ -1,13 +1,17 @@
 package com.dev.product_service.service;
 
+import com.dev.product_service.domain.ProcessedEvent;
 import com.dev.product_service.domain.Product;
-import com.dev.product_service.dto.ProductRequest;
-import com.dev.product_service.dto.ProductResponse;
+import com.dev.product_service.dto.*;
+import com.dev.product_service.event.StockEventProducer;
+import com.dev.product_service.repository.ProcessedEventRepository;
 import com.dev.product_service.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -16,6 +20,8 @@ import java.util.UUID;
 public class ProductService {
 
     private final ProductRepository repository;
+    private final ProcessedEventRepository processedEventRepository;
+    private final StockEventProducer stockEventProducer;
 
     public ProductResponse create(ProductRequest request) {
         Product product = Product.builder()
@@ -48,7 +54,6 @@ public class ProductService {
         repository.deleteById(id);
     }
 
-    @Transactional
     public void decreaseStock(UUID productId, Integer quantity) {
 
         Product product = repository.findById(productId)
@@ -62,6 +67,44 @@ public class ProductService {
 
         repository.save(product);
     }
+
+    @Transactional
+    public void processOrderEvent(OrderCreatedEvent event) {
+        try {
+            decreaseStock(event.productId(), event.quantity());
+
+            processedEventRepository.save(
+                    ProcessedEvent.builder()
+                            .eventId(event.orderId().toString())
+                            .processedAt(LocalDateTime.now())
+                            .build()
+            );
+
+            stockEventProducer.publishReserved(
+                    new StockReservedEvent(
+                            event.orderId(),
+                            event.productId(),
+                            event.quantity()
+                    )
+            );
+
+        } catch (DataIntegrityViolationException e) {
+
+            System.out.println("Evento já processado: " + event.orderId());
+
+        } catch (IllegalStateException e) {
+
+            stockEventProducer.publishFailed(
+                    new StockFailedEvent(
+                            event.orderId(),
+                            e.getMessage()
+                    )
+            );
+
+        }
+    }
+
+
 
 
     private ProductResponse mapToResponse(Product product) {

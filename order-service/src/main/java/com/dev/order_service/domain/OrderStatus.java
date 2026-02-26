@@ -2,14 +2,14 @@ package com.dev.order_service.domain;
 
 public enum OrderStatus {
     CREATED,
-    PAID,
+    CONFIRMED,
     SHIPPED,
     CANCELLED;
 
     public boolean canTransitionTo(OrderStatus newStatus) {
         return switch (this) {
-            case CREATED -> newStatus == PAID || newStatus == CANCELLED;
-            case PAID -> newStatus == SHIPPED;
+            case CREATED -> newStatus == CONFIRMED || newStatus == CANCELLED;
+            case CONFIRMED -> newStatus == SHIPPED;
             case SHIPPED, CANCELLED -> false;
         };
     }

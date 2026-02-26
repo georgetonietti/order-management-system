@@ -2,12 +2,16 @@ package com.dev.order_service.service;
 
 import com.dev.order_service.client.UserClient;
 import com.dev.order_service.domain.Order;
+import com.dev.order_service.domain.OutboxEvent;
 import com.dev.order_service.dto.*;
 import com.dev.order_service.domain.OrderStatus;
 
 import com.dev.order_service.repository.OrderRepository;
+import com.dev.order_service.repository.OutboxEventRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -15,8 +19,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
+
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +33,9 @@ public class OrderService {
     private final ProductLookupService poductLookupService;
     private final IdempotencyService idempotencyService;
     private final ApplicationEventPublisher publisher;
+    private final OutboxEventRepository outboxRepository;
+    private final ObjectMapper objectMapper;
+
 
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest request, String idempotencyKey) {
@@ -59,13 +68,24 @@ public class OrderService {
 
             idempotencyService.save(userId, idempotencyKey, savedOrder.getId());
 
-            publisher.publishEvent(new OrderCreatedDomainEvent(
+            OrderCreatedDomainEvent event = new OrderCreatedDomainEvent(
                     savedOrder.getId(),
                     savedOrder.getUserId(),
                     savedOrder.getProductId(),
                     savedOrder.getQuantity(),
                     savedOrder.getTotalPrice()
-            ));
+            );
+
+            OutboxEvent outbox = OutboxEvent.builder()
+                    .aggregateType("ORDER")
+                    .aggregateId(order.getId().toString())
+                    .type(OrderStatus.CREATED)
+                    .payload(objectMapper.writeValueAsString(event))
+                    .createdAt(LocalDateTime.now())
+                    .processed(false)
+                    .build();
+
+            outboxRepository.save(outbox);
 
             return mapToResponse(savedOrder);
 
@@ -80,6 +100,8 @@ public class OrderService {
             return repository.findById(record.getOrderId())
                     .map(this::mapToResponse)
                     .orElseThrow();
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
         }
     }
 

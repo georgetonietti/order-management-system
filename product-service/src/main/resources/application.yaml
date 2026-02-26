@@ -9,6 +9,13 @@ spring:
     show-sql: true
   kafka:
     bootstrap-servers: kafka:9092
+
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+
     consumer:
       group-id: product-group
       auto-offset-reset: earliest
@@ -16,5 +23,7 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: "*"
+
     listener:
       ack-mode: record
+      missing-topics-fatal: false
