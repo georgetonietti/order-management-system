@@ -76,11 +76,13 @@ public class OrderService {
                     savedOrder.getTotalPrice()
             );
 
+            String payload = objectMapper.writeValueAsString(event);
+
             OutboxEvent outbox = OutboxEvent.builder()
                     .aggregateType("ORDER")
                     .aggregateId(order.getId().toString())
                     .type(OrderStatus.CREATED)
-                    .payload(objectMapper.writeValueAsString(event))
+                    .payload(payload)
                     .createdAt(LocalDateTime.now())
                     .processed(false)
                     .build();
